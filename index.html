@@ -313,6 +313,71 @@ body {
 }
 .complete-overlay.show { display: flex; }
 
+/* CAMERA OVERLAY */
+.camera-overlay {
+  position: fixed; inset: 0;
+  background: #000;
+  z-index: 200;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.camera-overlay.show { display: flex; }
+
+.camera-video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  position: absolute; inset: 0;
+}
+
+.camera-ui {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  padding-bottom: max(48px, env(safe-area-inset-bottom, 48px));
+  gap: 24px;
+}
+
+.camera-label {
+  font-size: 15px; font-weight: 600; color: #fff;
+  background: rgba(0,0,0,0.4);
+  padding: 8px 20px; border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+
+.camera-btn-row {
+  display: flex; align-items: center; justify-content: center;
+  gap: 48px; width: 100%;
+}
+
+.camera-cancel-btn {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.camera-cancel-btn svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+.camera-shutter {
+  width: 76px; height: 76px; border-radius: 50%;
+  background: #fff;
+  border: 4px solid rgba(255,255,255,0.5);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.camera-shutter:active { transform: scale(0.92); opacity: 0.85; }
+
+.camera-flip-btn {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.camera-flip-btn svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
 .complete-orb {
   width: 110px; height: 110px; border-radius: 50%;
   background: radial-gradient(circle at 38% 35%, rgba(200,190,255,0.95) 0%, rgba(160,150,240,0.7) 55%, rgba(139,156,244,0.3) 100%);
@@ -668,6 +733,23 @@ body {
       <div class="complete-title">오늘도 완벽하게<br>준비 완료</div>
       <div class="complete-desc">모든 항목을 마쳤어요.<br>잊은 거 없어요, 걱정 마세요.</div>
       <button class="complete-btn" onclick="closeOverlay()">확인했어요</button>
+    </div>
+  </div>
+
+  <!-- ══ CAMERA OVERLAY ══ -->
+  <div class="camera-overlay" id="cameraOverlay">
+    <video class="camera-video" id="cameraVideo" autoplay playsinline muted></video>
+    <div class="camera-ui">
+      <div class="camera-label" id="cameraLabel">확인하고 촬영하세요</div>
+      <div class="camera-btn-row">
+        <div class="camera-cancel-btn" id="cameraCancelBtn">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+        <div class="camera-shutter" id="cameraShutterBtn"></div>
+        <div class="camera-flip-btn" id="cameraFlipBtn">
+          <svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1306,21 +1388,6 @@ function makeBubble(text, idx, sizeClass) {
       }
     }
 
-    // iOS Safari: 터치 컨텍스트 유지를 위해 input을 미리 생성해둠
-    const camInput = document.createElement('input');
-    camInput.type = 'file';
-    camInput.accept = 'image/*';
-    camInput.capture = 'environment';
-    camInput.style.cssText = 'position:fixed;top:-200px;left:-200px;width:1px;height:1px;opacity:0;';
-    camInput.onchange = (e) => {
-      const file = e.target.files[0];
-      if (document.body.contains(camInput)) document.body.removeChild(camInput);
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => completeBubble(id, ev.target.result);
-      reader.readAsDataURL(file);
-    };
-
     // touch move 리스너 (전역 — 버블 밖으로 나가도 추적)
     function onTouchMove(e) {
       const t = e.touches[0];
@@ -1332,13 +1399,8 @@ function makeBubble(text, idx, sizeClass) {
       const t = e.changedTouches[0];
       const hit = getHoveredBtn(t.clientX, t.clientY);
       dismissMenu();
-      if (hit === 'camera') {
-        // iOS: 터치 컨텍스트 안에서 바로 click — dismissMenu 후 즉시 호출
-        document.body.appendChild(camInput);
-        camInput.click();
-      } else if (hit === 'check') {
-        completeBubble(id, null);
-      }
+      if      (hit === 'camera') openCamera(id);
+      else if (hit === 'check')  completeBubble(id, null);
     }
 
     // mouse move 리스너
@@ -1433,40 +1495,110 @@ function makeBubble(text, idx, sizeClass) {
   return div;
 }
 
-function openCamera(id) {
-  const el = document.getElementById(id);
-  if (!el || el.classList.contains('completing') || el.classList.contains('vanish')) return;
+// ── 카메라 오버레이 (getUserMedia) ──
+let _cameraStream = null;
+let _cameraTargetId = null;
+let _facingMode = 'environment'; // 기본 후면
 
+function openCamera(id) {
+  _cameraTargetId = id;
+  const overlay = document.getElementById('cameraOverlay');
+  const video   = document.getElementById('cameraVideo');
+  const label   = document.getElementById('cameraLabel');
+
+  // 라벨에 항목명 표시
+  const el = document.getElementById(id);
+  if (el) {
+    const lbl = el.querySelector('.task-label');
+    if (lbl) label.textContent = lbl.textContent.trim();
+  }
+
+  overlay.classList.add('show');
+  startCameraStream();
+}
+
+function startCameraStream() {
+  const video = document.getElementById('cameraVideo');
+
+  // 기존 스트림 정지
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: _facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  }).then(stream => {
+    _cameraStream = stream;
+    video.srcObject = stream;
+  }).catch(err => {
+    console.error('카메라 오류:', err);
+    closeCameraOverlay();
+    // getUserMedia 실패 시 input fallback
+    openCameraFallback(_cameraTargetId);
+  });
+}
+
+function openCameraFallback(id) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.capture = 'environment';
-  // iOS Safari: display:none이면 .click() 무시됨 — 화면 밖으로 숨김
   input.style.cssText = 'position:fixed;top:-200px;left:-200px;width:1px;height:1px;opacity:0;';
-  document.body.appendChild(input);
-
   input.onchange = (e) => {
     const file = e.target.files[0];
     if (document.body.contains(input)) document.body.removeChild(input);
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const photoData = ev.target.result;
-      completeBubble(id, photoData);
-    };
+    reader.onload = (ev) => completeBubble(id, ev.target.result);
     reader.readAsDataURL(file);
   };
-
-  window.addEventListener('focus', function onFocus() {
-    setTimeout(() => {
-      if (document.body.contains(input)) document.body.removeChild(input);
-      window.removeEventListener('focus', onFocus);
-    }, 500);
-  });
-
+  document.body.appendChild(input);
   input.click();
 }
+
+function closeCameraOverlay() {
+  if (_cameraStream) {
+    _cameraStream.getTracks().forEach(t => t.stop());
+    _cameraStream = null;
+  }
+  document.getElementById('cameraVideo').srcObject = null;
+  document.getElementById('cameraOverlay').classList.remove('show');
+  _cameraTargetId = null;
+}
+
+function shootCamera() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const photoData = canvas.toDataURL('image/jpeg', 0.85);
+  closeCameraOverlay();
+  if (_cameraTargetId) completeBubble(_cameraTargetId, photoData);
+}
+
+// 카메라 버튼 이벤트
+document.getElementById('cameraShutterBtn').addEventListener('click', shootCamera);
+document.getElementById('cameraCancelBtn').addEventListener('click', closeCameraOverlay);
+document.getElementById('cameraFlipBtn').addEventListener('click', () => {
+  _facingMode = _facingMode === 'environment' ? 'user' : 'environment';
+  startCameraStream();
+});
+
+// 터치도 지원
+document.getElementById('cameraShutterBtn').addEventListener('touchend', (e) => {
+  e.preventDefault(); shootCamera();
+});
+document.getElementById('cameraCancelBtn').addEventListener('touchend', (e) => {
+  e.preventDefault(); closeCameraOverlay();
+});
+document.getElementById('cameraFlipBtn').addEventListener('touchend', (e) => {
+  e.preventDefault();
+  _facingMode = _facingMode === 'environment' ? 'user' : 'environment';
+  startCameraStream();
+});
 
 function completeBubble(id, photoData) {
   const el = document.getElementById(id);
