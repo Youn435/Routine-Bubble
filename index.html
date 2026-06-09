@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Ready Go — 외출 준비</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ready Go">
+<meta name="theme-color" content="#f2f4ff">
+<!-- tabler 웹폰트 제거 — SVG 인라인으로 대체 -->
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:       #f2f4ff;
+  --surface:  rgba(255,255,255,0.82);
+  --border:   rgba(170,178,230,0.28);
+  --border2:  rgba(150,160,220,0.45);
+  --accent:   #7b8cde;
+  --accent2:  #a78bfa;
+  --text:     #2a2d4a;
+  --sub:      #8f93b8;
+  --hint:     #b8bcce;
+  --green:    #59b88a;
+  --font:     -apple-system, 'Pretendard', sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  overflow: hidden;
+  width: 100vw; height: 100vh;
+}
+
+.app {
+  width: 100vw; height: 100vh;
+  height: -webkit-fill-available;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  overflow: hidden; position: relative;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.status-bar { display: none; }
+.view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.view.active { display: flex; }
+
+/* ══ NAV ══ */
+.nav-bar {
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 8px;
+  background: rgba(255,255,255,0.9);
+  border-bottom: 1px solid var(--border2);
+  flex-shrink: 0; z-index: 10; order: -1;
+}
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  cursor: pointer; opacity: 0.35; transition: all 0.2s;
+  padding: 8px 20px; min-height: 48px; justify-content: center;
+  border-radius: 14px; user-select: none;
+}
+.nav-item.active { opacity: 1; background: rgba(123,140,222,0.1); }
+.nav-item svg { width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; display: block; }
+.nav-label { font-size: 11px; color: var(--text); font-weight: 500; }
+
+/* ══ HOME ══ */
+#view-home { background: var(--bg); position: relative; overflow: hidden; }
+
+.glow-orb { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(55px); }
+.glow-orb-1 { width: 65vw; height: 65vw; top: -15%; left: -20%; background: radial-gradient(circle, rgba(180,160,255,0.35) 0%, transparent 70%); }
+.glow-orb-2 { width: 55vw; height: 55vw; top: 5%; right: -15%; background: radial-gradient(circle, rgba(140,175,255,0.3) 0%, transparent 70%); }
+.glow-orb-3 { width: 50vw; height: 50vw; bottom: 15%; left: 10%; background: radial-gradient(circle, rgba(160,210,255,0.2) 0%, transparent 70%); }
+
+.home-top {
+  padding: 20px 24px 0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-shrink: 0; position: relative; z-index: 1;
+}
+
+.time-display {
+  font-size: clamp(48px, 15vw, 72px);
+  font-weight: 100; color: var(--text);
+  letter-spacing: -3px; line-height: 1;
+}
+.time-sub { font-size: 13px; color: var(--hint); margin-top: 6px; }
+
+.bubble-stage { flex: 1; position: relative; overflow: hidden; z-index: 1; }
+
+.home-countdown-box {
+  text-align: right; cursor: pointer;
+  background: rgba(123,140,222,0.08);
+  border: 1px solid rgba(123,140,222,0.2);
+  border-radius: 16px; padding: 10px 14px;
+  min-width: 88px;
+}
+.home-countdown-label {
+  font-size: 10px; color: var(--hint);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 3px;
+}
+.home-countdown-num {
+  font-size: clamp(20px, 6vw, 26px);
+  font-weight: 200; color: var(--accent);
+  letter-spacing: -0.5px; line-height: 1.1;
+}
+
+.empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px; padding: 40px;
+}
+.empty-icon {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(123,140,222,0.1);
+  border: 1.5px solid rgba(123,140,222,0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-icon i { font-size: 24px; color: var(--accent); }
+.empty-text { font-size: 15px; color: var(--hint); text-align: center; line-height: 1.9; }
+.empty-text strong { color: var(--sub); font-weight: 500; }
+
+/* BUBBLES */
+.bubble {
+  border-radius: 50%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer; user-select: none;
+  position: absolute; will-change: transform;
+  background: #fff;
+  box-shadow: 0 6px 24px rgba(100,110,190,0.18), 0 2px 8px rgba(100,110,190,0.10);
+  opacity: 0;
+  animation: bubbleFadeIn 0.5s ease forwards;
+  -webkit-tap-highlight-color: transparent;
+  /* iOS 길게 누르기 기본 동작 차단 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.bubble:active { opacity: 1 !important; }
+
+@keyframes bubbleLongPress {
+  0%   { box-shadow: 0 6px 24px rgba(100,110,190,0.18), 0 0 0 0 rgba(123,140,222,0.5); }
+  100% { box-shadow: 0 6px 24px rgba(100,110,190,0.18), 0 0 0 24px rgba(123,140,222,0); }
+}
+@keyframes bubblePulseScale {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+.bubble.pressing {
+  animation: bubbleLongPress 0.6s ease forwards,
+             bubblePulseScale 0.6s ease infinite;
+  border: 2px solid rgba(123,140,222,0.7) !important;
+}
+
+@keyframes bubbleFadeIn {
+  0%   { opacity: 0; transform: scale(0.75); }
+  60%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.task-label {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  text-align: center; padding: 0 14px; line-height: 1.35;
+  transition: opacity 0.2s;
+}
+.task-meta { font-size: 11px; color: var(--sub); margin-top: 4px; transition: opacity 0.2s; }
+
+.done-ring {
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 2.5px solid var(--green); opacity: 0; transition: opacity 0.3s;
+}
+.done-check {
+  position: absolute; font-size: 20px; color: var(--green);
+  opacity: 0; transition: opacity 0.3s 0.1s; font-weight: 700;
+}
+.bubble.completing .done-ring { opacity: 1; }
+.bubble.completing .task-label { opacity: 0; }
+.bubble.completing .task-meta { opacity: 0; }
+.bubble.completing .done-check { opacity: 1; }
+
+@keyframes bubblePop {
+  0%   { transform: scale(1); opacity: 1; }
+  25%  { transform: scale(1.1); }
+  100% { transform: scale(0); opacity: 0; }
+}
+.bubble.vanish {
+  animation: bubblePop 0.4s cubic-bezier(0.4,0,0.6,1) forwards !important;
+  pointer-events: none;
+}
+
+/* ── 버블 액션 메뉴 (꾹 누르기 후 나타나는 카메라/체크 아이콘) ── */
+.bubble-action-menu {
+  position: absolute;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  gap: 18px;
+  transform: translate(-50%, -50%);
+}
+.bubble-action-btn {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff;
+  box-shadow: 0 6px 24px rgba(80,90,180,0.22), 0 2px 8px rgba(80,90,180,0.12);
+  border: 2px solid rgba(123,140,222,0.18);
+  cursor: pointer;
+  pointer-events: all;
+  padding: 0;
+  box-sizing: border-box;
+  /* 팝인 애니메이션 — opacity·scale을 CSS 변수로 분리해서 hover transform과 충돌 방지 */
+  animation: actionBtnPop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.bubble-action-btn:nth-child(1) { animation-delay: 0s; }
+.bubble-action-btn:nth-child(2) { animation-delay: 0.07s; }
+
+.bubble-action-btn svg {
+  width: 24px; height: 24px;
+  stroke: #7b8cde; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0;
+  display: block;
+}
+.bubble-action-btn.action-check svg { stroke: #59b88a; }
+
+@keyframes actionBtnPop {
+  0%   { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.bubble-action-btn.hovered {
+  transform: scale(1.22) !important;
+  box-shadow: 0 8px 32px rgba(80,90,180,0.32);
+}
+.bubble-action-btn.hovered.action-camera {
+  background: #7b8cde; border-color: #7b8cde;
+}
+.bubble-action-btn.hovered.action-camera svg { stroke: #fff; }
+.bubble-action-btn.hovered.action-check {
+  background: #59b88a; border-color: #59b88a;
+}
+.bubble-action-btn.hovered.action-check svg { stroke: #fff; }
+
+/* DEPART BAR */
+.depart-bar {
+  flex-shrink: 0; padding: 14px 20px 16px;
+  background: rgba(255,255,255,0.9);
+  border-top: 1px solid var(--border2); z-index: 5;
+}
+.depart-meta {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+  margin-bottom: 14px;
+}
+.depart-left { display: flex; flex-direction: column; justify-content: center; }
+.depart-label-text { font-size: 11px; color: var(--hint); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+.depart-countdown-num {
+  font-size: clamp(24px, 7vw, 32px);
+  font-weight: 200; color: var(--text);
+  letter-spacing: -1px; line-height: 1;
+}
+.depart-countdown-num span {
+  font-size: 13px; font-weight: 400; color: var(--sub);
+  letter-spacing: 0; margin-left: 2px;
+}
+
+.progress-wrap { position: relative; }
+.progress-track {
+  width: 100%; height: 20px;
+  background: rgba(123,140,222,0.1);
+  border-radius: 99px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 99px; width: 0%;
+  transition: width 1s linear;
+}
+.progress-label-row {
+  display: flex; justify-content: space-between;
+  margin-top: 6px;
+}
+.progress-label-row span {
+  font-size: 11px; color: var(--hint); font-weight: 500;
+}
+
+@keyframes countdownUrgent {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+.depart-countdown-num.urgent { animation: countdownUrgent 1.5s ease-in-out infinite; }
+#departTimeBtn {
+  flex-shrink: 0;
+  background: rgba(123,140,222,0.08);
+  border: 1px solid rgba(123,140,222,0.25);
+  border-radius: 999px; cursor: pointer;
+  padding: 10px 16px; font-size: 13px; min-height: 44px;
+  color: var(--accent); font-family: inherit; font-weight: 600;
+  white-space: nowrap; display: flex; align-items: center; gap: 6px;
+}
+#departTimeBtn i { font-size: 14px; }
+
+/* COMPLETE OVERLAY */
+.complete-overlay {
+  position: absolute; inset: 0;
+  background: rgba(242,244,255,0.97);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 20; gap: 14px; padding: 40px;
+}
+.complete-overlay.show { display: flex; }
+
+.complete-orb {
+  width: 110px; height: 110px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, rgba(200,190,255,0.95) 0%, rgba(160,150,240,0.7) 55%, rgba(139,156,244,0.3) 100%);
+  box-shadow: 0 12px 48px rgba(123,140,222,0.25);
+  margin-bottom: 8px;
+  animation: popIn 0.5s cubic-bezier(0.17,0.67,0.45,1.3);
+}
+@keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+
+.complete-title { font-size: 24px; font-weight: 300; color: var(--text); text-align: center; line-height: 1.5; }
+.complete-desc { font-size: 14px; color: var(--sub); text-align: center; line-height: 1.7; }
+.complete-btn {
+  margin-top: 16px; padding: 15px 44px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: 999px; color: #fff;
+  font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+  box-shadow: 0 4px 20px rgba(123,140,222,0.3);
+}
+
+/* ══ CHECKLIST ══ */
+#view-checklist { background: var(--bg); overflow: hidden; }
+
+.screen-header {
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--border2);
+  background: rgba(255,255,255,0.9);
+  flex-shrink: 0;
+}
+.screen-title { font-size: 18px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+.screen-sub { font-size: 13px; color: var(--hint); margin-top: 3px; }
+
+.template-tabs {
+  display: flex; gap: 8px; padding: 14px 20px;
+  overflow-x: auto; scrollbar-width: none; flex-shrink: 0; background: var(--bg);
+}
+.template-tabs::-webkit-scrollbar { display: none; }
+
+.tab-pill {
+  flex-shrink: 0; font-size: 14px; padding: 8px 18px; min-height: 36px;
+  border-radius: 999px; border: 1px solid var(--border2);
+  background: #fff; cursor: pointer;
+  color: var(--sub); font-family: inherit; transition: all 0.15s; font-weight: 500;
+}
+.tab-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.checklist-body {
+  flex: 1; overflow-y: auto; padding: 8px 16px 12px;
+  -webkit-overflow-scrolling: touch; min-height: 0;
+  background: #e8eaf8;
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.check-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 12px; border-bottom: none;
+  cursor: pointer; user-select: none; min-height: 56px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(100,110,190,0.08);
+}
+.check-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.2s; font-size: 12px; color: transparent;
+  margin: 8px 4px;
+}
+.check-item.checked .check-circle {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent; color: #fff;
+}
+.check-text {
+  flex: 1; font-size: 15px; color: var(--text); transition: all 0.2s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.check-item.checked .check-text { color: var(--hint); text-decoration: line-through; }
+.check-badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(123,140,222,0.1); color: var(--accent); font-weight: 500; }
+
+.drag-handle {
+  font-size: 16px; color: var(--hint); cursor: grab;
+  padding: 10px 8px; user-select: none; flex-shrink: 0;
+  min-height: 44px; display: flex; align-items: center;
+}
+.drag-handle:active { cursor: grabbing; }
+
+.edit-btn, .del-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 10px; border-radius: 10px; flex-shrink: 0;
+  transition: background 0.1s; line-height: 1;
+  min-width: 44px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
+}
+.edit-btn { color: var(--hint); font-size: 15px; }
+.edit-btn:hover { background: rgba(123,140,222,0.1); color: var(--accent); }
+.del-btn { color: var(--hint); font-size: 13px; }
+.del-btn:hover { background: rgba(220,80,80,0.08); color: #e06060; }
+
+.check-item {
+  transition: transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.check-item.dragging {
+  opacity: 0;
+  pointer-events: none;
+}
+.check-item.shift-down  { transform: translateY(56px); }
+.check-item.shift-up    { transform: translateY(-56px); }
+.check-text[contenteditable="true"] {
+  outline: none; border-bottom: 1.5px solid var(--accent); padding-bottom: 1px;
+  white-space: normal; overflow: visible; text-overflow: clip;
+}
+
+.add-item-row { padding: 8px 0 4px; }
+
+/* 출발 완료 배너 */
+.depart-done-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  padding: max(52px, env(safe-area-inset-top, 52px)) 24px 20px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; z-index: 300; text-align: center;
+  animation: slideDown 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+.depart-done-title { font-size: 20px; font-weight: 600; color: #fff; }
+.depart-done-desc { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.depart-done-btn {
+  margin-top: 8px; padding: 10px 28px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 999px; color: #fff;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+
+/* 온보딩 툴팁 */
+.drag-tooltip {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--text);
+  color: #fff;
+  padding: 18px 24px;
+  padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
+  display: flex; align-items: center; gap: 14px;
+  z-index: 200;
+  animation: slideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.drag-tooltip-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(255,255,255,0.12);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 18px;
+}
+.drag-tooltip-text {
+  flex: 1;
+  font-size: 13px; line-height: 1.6; color: rgba(255,255,255,0.9);
+}
+.drag-tooltip-text strong {
+  display: block; font-size: 14px; font-weight: 600;
+  color: #fff; margin-bottom: 2px;
+}
+.drag-tooltip-close {
+  background: rgba(255,255,255,0.15);
+  border: none; border-radius: 8px;
+  color: #fff; font-size: 12px; font-weight: 600;
+  padding: 6px 12px; cursor: pointer; font-family: inherit;
+  flex-shrink: 0;
+}
+.add-item-btn {
+  font-size: 14px; color: var(--accent);
+  background: rgba(123,140,222,0.08);
+  border: 1.5px dashed rgba(123,140,222,0.6);
+  border-radius: 12px; padding: 13px 16px; min-height: 48px;
+  cursor: pointer; font-family: inherit; width: 100%;
+  transition: background 0.15s; font-weight: 600;
+}
+
+.checklist-footer {
+  padding: 12px 20px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  background: rgba(255,255,255,0.9);
+  border-top: 1px solid var(--border2); flex-shrink: 0;
+}
+.start-btn {
+  width: 100%; padding: clamp(14px, 4vw, 17px);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  color: #fff; font-size: 16px; font-weight: 700;
+  border: none; border-radius: 16px; cursor: pointer; font-family: inherit;
+  transition: opacity 0.15s; box-shadow: 0 4px 20px rgba(123,140,222,0.3);
+}
+.start-btn:active { opacity: 0.85; }
+
+/* ══ ARCHIVE ══ */
+#view-archive { background: var(--bg); overflow: hidden; }
+
+.archive-scroll {
+  flex: 1; overflow-y: auto; padding: 16px 20px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reassure-card {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  border-radius: 20px; padding: 20px 22px; flex-shrink: 0;
+  box-shadow: 0 6px 24px rgba(123,140,222,0.25);
+}
+.reassure-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 5px; }
+.reassure-desc { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+
+.archive-empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  flex: 1; gap: 14px; padding: 60px 32px; text-align: center;
+}
+.archive-empty-orb {
+  width: 68px; height: 68px; border-radius: 50%;
+  background: rgba(123,140,222,0.08);
+  border: 1.5px solid rgba(123,140,222,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.archive-empty-orb i { font-size: 26px; color: var(--hint); }
+.archive-empty-text { font-size: 14px; color: var(--hint); line-height: 1.8; }
+
+.photo-card {
+  background: #fff; border-radius: 18px;
+  overflow: hidden; border: 1px solid var(--border2);
+  flex-shrink: 0; box-shadow: 0 2px 12px rgba(100,110,180,0.07);
+}
+.photo-thumb {
+  width: 100%; height: 120px;
+  background: linear-gradient(135deg, rgba(200,195,255,0.35) 0%, rgba(170,210,255,0.35) 100%);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photo-thumb-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(123,140,222,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-thumb-icon i { font-size: 17px; color: var(--accent); }
+.photo-info { padding: 12px 18px 15px; }
+.photo-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.photo-time { font-size: 12px; color: var(--hint); margin-top: 3px; }
+.photo-stamp {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 9px; font-size: 12px; font-weight: 500;
+  color: var(--green); background: rgba(89,184,138,0.1);
+  padding: 4px 12px; border-radius: 999px;
+  border: 1px solid rgba(89,184,138,0.2);
+}
+.photo-stamp i { font-size: 12px; }
+
+/* ══ SHEET ══ */
+.sheet-overlay {
+  position: fixed; inset: 0; background: rgba(30,32,60,0.4);
+  z-index: 100; display: flex; align-items: flex-end;
+}
+.sheet {
+  width: 100%; background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 20px 24px 44px;
+  font-family: var(--font);
+  border-top: 1px solid var(--border2);
+}
+.sheet-handle {
+  width: 36px; height: 4px; background: #dde;
+  border-radius: 99px; margin: 0 auto 22px;
+}
+.sheet-title { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.sheet-sub { font-size: 14px; color: var(--sub); line-height: 1.6; margin-bottom: 4px; }
+.sheet-btn-row { display: flex; gap: 10px; margin-top: 22px; }
+.sheet-btn {
+  flex: 1; padding: 15px; border: none; border-radius: 14px;
+  font-size: 15px; font-family: var(--font); cursor: pointer; font-weight: 600;
+  min-height: 52px;
+}
+.sheet-btn.secondary { background: #f4f5fa; color: var(--sub); border: 1px solid var(--border2); }
+.sheet-btn.primary {
+  flex: 2;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; box-shadow: 0 4px 16px rgba(123,140,222,0.3);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="status-bar"><span id="statusTime"></span></div>
+
+  <!-- ══ HOME ══ -->
+  <div class="view active" id="view-home">
+    <div class="glow-orb glow-orb-1"></div>
+    <div class="glow-orb glow-orb-2"></div>
+    <div class="glow-orb glow-orb-3"></div>
+
+    <div class="home-top">
+      <div>
+        <div class="time-display" id="clock">09:41</div>
+        <div class="time-sub" id="homeSubtitle">루틴 탭에서 시작해보세요</div>
+      </div>
+      <div class="home-countdown-box" onclick="openDepartSetting()">
+        <div class="home-countdown-label">출발까지</div>
+        <div class="home-countdown-num" id="homeCountdown">—</div>
+      </div>
+    </div>
+
+    <div class="bubble-stage" id="bubbleStage">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon"><svg style="width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="empty-text">
+          <strong>루틴</strong> 탭에서<br>
+          오늘 항목을 고르고<br>
+          <strong>시작하기</strong>를 눌러보세요
+        </div>
+      </div>
+    </div>
+
+    <div class="depart-bar">
+      <div class="depart-meta">
+        <div class="depart-left">
+          <div class="depart-label-text">출발까지 남은 시간</div>
+          <div class="depart-countdown-num" id="countdown">—</div>
+        </div>
+        <button id="departTimeBtn" onclick="openDepartSetting()">
+          <svg style="width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          <span id="departLabel">시간 설정</span>
+        </button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-label-row">
+          <span>지금</span>
+          <span id="progressEnd">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="complete-overlay" id="completeOverlay">
+      <div class="complete-orb"></div>
+      <div class="complete-title">오늘도 완벽하게<br>준비 완료</div>
+      <div class="complete-desc">모든 항목을 마쳤어요.<br>잊은 거 없어요, 걱정 마세요.</div>
+      <button class="complete-btn" onclick="closeOverlay()">확인했어요</button>
+    </div>
+  </div>
+
+  <!-- ══ CHECKLIST ══ -->
+  <div class="view" id="view-checklist">
+    <div class="screen-header">
+      <div class="screen-title">외출 준비 루틴</div>
+      <div class="screen-sub">위일수록 크게 떠요</div>
+    </div>
+    <div class="template-tabs">
+      <button class="tab-pill active" onclick="loadTemplate(this,'morning')">출근</button>
+      <button class="tab-pill" onclick="loadTemplate(this,'casual')">외출</button>
+      <button class="tab-pill" onclick="loadTemplate(this,'school')">등교</button>
+      <button class="tab-pill" onclick="loadTemplate(this,'travel')">여행</button>
+    </div>
+    <div class="checklist-body" id="checklistBody"></div>
+    <div class="checklist-footer">
+      <button class="start-btn" onclick="startRoutine()">이 루틴으로 시작하기</button>
+    </div>
+  </div>
+
+  <!-- ══ ARCHIVE ══ -->
+  <div class="view" id="view-archive">
+    <div class="screen-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="screen-title">확인 아카이브</div>
+        <div class="screen-sub" id="archiveSub">불안할 때 열어보세요</div>
+      </div>
+      <button onclick="confirmClearArchive()" style="
+        font-size:11px;color:var(--hint);background:none;
+        border:0.5px solid var(--border);border-radius:999px;
+        padding:5px 12px;cursor:pointer;font-family:inherit;
+        white-space:nowrap;flex-shrink:0;font-weight:500;
+      ">초기화</button>
+    </div>
+    <div class="archive-scroll" id="archiveScroll"></div>
+  </div>
+
+  <!-- ══ NAV ══ -->
+  <div class="nav-bar">
+    <div class="nav-item active" id="nav-home" onclick="switchView('home')">
+      <svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>
+      <span class="nav-label">지금</span>
+    </div>
+    <div class="nav-item" id="nav-checklist" onclick="switchView('checklist')">
+      <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span class="nav-label">루틴</span>
+    </div>
+    <div class="nav-item" id="nav-archive" onclick="switchView('archive')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/><polyline points="9 17 9.01 17"/></svg>
+      <span class="nav-label">아카이브</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const templates = {
+  morning: [
+    {text:'지갑 챙기기', badge:'필수'},
+    {text:'열쇠 확인', badge:'필수'},
+    {text:'가스 잠금', badge:'안전'},
+    {text:'핸드폰 충전기', badge:''},
+    {text:'노트북', badge:''},
+    {text:'텀블러', badge:''},
+    {text:'현관문 잠금', badge:'안전'},
+  ],
+  casual: [
+    {text:'지갑', badge:'필수'},
+    {text:'핸드폰', badge:'필수'},
+    {text:'이어폰', badge:''},
+    {text:'가스 확인', badge:'안전'},
+    {text:'현관 잠금', badge:'안전'},
+  ],
+  school: [
+    {text:'교재/노트', badge:'필수'},
+    {text:'학생증', badge:'필수'},
+    {text:'도시락/카드', badge:''},
+    {text:'충전기', badge:''},
+    {text:'현관 잠금', badge:'안전'},
+  ],
+  travel: [
+    {text:'여권/신분증', badge:'필수'},
+    {text:'항공권', badge:'필수'},
+    {text:'지갑', badge:'필수'},
+    {text:'충전기/어댑터', badge:''},
+    {text:'세면도구', badge:''},
+    {text:'가스 잠금', badge:'안전'},
+    {text:'현관 이중 잠금', badge:'안전'},
+  ]
+};
+
+let currentKey = 'morning';
+let doneCount = 0;
+let totalBubbles = 0;
+
+function saveTemplates() {
+  localStorage.setItem('readygo_templates', JSON.stringify(templates));
+}
+function loadSavedTemplates() {
+  const saved = localStorage.getItem('readygo_templates');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    Object.assign(templates, parsed);
+  }
+}
+
+let dragSrc = null;
+
+// ── auto-scroll 전용 interval ──
+let _autoScrollInterval = null;
+
+function stopAutoScroll() {
+  if (_autoScrollInterval) {
+    clearInterval(_autoScrollInterval);
+    _autoScrollInterval = null;
+  }
+}
+
+function startAutoScroll(direction) {
+  stopAutoScroll();
+  const body = document.getElementById('checklistBody');
+  const SPEED = 8;
+  _autoScrollInterval = setInterval(() => {
+    body.scrollTop += direction * SPEED;
+  }, 16);
+}
+
+const checkedSets = {};
+
+function renderChecklist(key) {
+  currentKey = key;
+  const body = document.getElementById('checklistBody');
+  body.innerHTML = '';
+
+  if (!checkedSets[key]) checkedSets[key] = new Set();
+  const checkedSet = checkedSets[key];
+
+  (templates[key] || []).forEach((item, idx) => {
+    const d = document.createElement('div');
+    d.className = 'check-item';
+    if (checkedSet.has(idx)) d.classList.add('checked');
+    d.dataset.idx = idx;
+    d.draggable = false;
+    d.innerHTML = `
+      <div class="drag-handle">⠿</div>
+      <div class="check-circle">✓</div>
+      <span class="check-text" contenteditable="false">${item.text}</span>
+      ${item.badge ? `<span class="check-badge">${item.badge}</span>` : ''}
+      <button class="edit-btn" title="수정">✎</button>
+      <button class="del-btn" title="삭제">✕</button>
+    `;
+
+    d.querySelector('.check-circle').onclick = (e) => {
+      e.stopPropagation();
+      d.classList.toggle('checked');
+      const i = parseInt(d.dataset.idx);
+      if (d.classList.contains('checked')) checkedSet.add(i);
+      else checkedSet.delete(i);
+    };
+
+    const editBtn = d.querySelector('.edit-btn');
+    const textEl  = d.querySelector('.check-text');
+    editBtn.onclick = (e) => {
+      e.stopPropagation();
+      const editing = textEl.contentEditable === 'true';
+      if (editing) {
+        textEl.contentEditable = 'false';
+        textEl.blur();
+        templates[key][idx].text = textEl.textContent.trim() || item.text;
+        saveTemplates();
+        editBtn.textContent = '✎';
+        editBtn.style.color = '#bbb';
+      } else {
+        textEl.contentEditable = 'true';
+        textEl.focus();
+        const range = document.createRange();
+        range.selectNodeContents(textEl);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        editBtn.textContent = '✔';
+        editBtn.style.color = '#4a9';
+      }
+    };
+
+    textEl.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); editBtn.click(); }
+    };
+
+    d.querySelector('.del-btn').onclick = (e) => {
+      e.stopPropagation();
+      templates[key].splice(idx, 1);
+      saveTemplates();
+      const newSet = new Set();
+      checkedSet.forEach(ci => {
+        if (ci === idx) return;
+        newSet.add(ci > idx ? ci - 1 : ci);
+      });
+      checkedSets[key] = newSet;
+      renderChecklist(key);
+    };
+
+    const handle = d.querySelector('.drag-handle');
+    handle.addEventListener('mousedown', () => { d.draggable = true; });
+    handle.addEventListener('touchstart', () => { d.draggable = true; }, {passive:true});
+    d.addEventListener('dragend', () => { d.draggable = false; });
+
+    d.addEventListener('dragstart', (e) => {
+      dragSrc = d;
+      setTimeout(() => d.classList.add('dragging'), 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    d.addEventListener('dragend', () => {
+      d.draggable = false;
+      d.classList.remove('dragging');
+      // ── auto-scroll 정지 ──
+      stopAutoScroll();
+      body.querySelectorAll('.check-item').forEach(el => {
+        el.classList.remove('shift-down', 'shift-up');
+      });
+    });
+
+    d.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      // ── auto-scroll: 목록 상하 끝 근처에서 자동 스크롤 ──
+      const rect = body.getBoundingClientRect();
+      const ZONE = 80; // 감지 영역 px
+      const y = e.clientY;
+      if (y < rect.top + ZONE) {
+        startAutoScroll(-1); // 위로
+      } else if (y > rect.bottom - ZONE) {
+        startAutoScroll(1);  // 아래로
+      } else {
+        stopAutoScroll();    // 중간이면 정지
+      }
+
+      if (!dragSrc || d === dragSrc) return;
+
+      const fromIdx = parseInt(dragSrc.dataset.idx);
+      const toIdx   = parseInt(d.dataset.idx);
+      const items   = Array.from(body.querySelectorAll('.check-item'));
+
+      items.forEach(el => el.classList.remove('shift-down', 'shift-up'));
+
+      items.forEach(el => {
+        const i = parseInt(el.dataset.idx);
+        if (el === dragSrc) return;
+        if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
+          el.classList.add('shift-up');
+        } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
+          el.classList.add('shift-down');
+        }
+      });
+    });
+
+    d.addEventListener('drop', (e) => {
+      e.preventDefault();
+      stopAutoScroll();
+      if (dragSrc && dragSrc !== d) {
+        const fromIdx = parseInt(dragSrc.dataset.idx);
+        const toIdx   = parseInt(d.dataset.idx);
+
+        const arr = templates[key];
+        const [moved] = arr.splice(fromIdx, 1);
+        arr.splice(toIdx, 0, moved);
+        saveTemplates();
+
+        const wasChecked = checkedSet.has(fromIdx);
+        const newSet = new Set();
+        checkedSet.forEach(ci => {
+          if (ci === fromIdx) return;
+          let ni = ci;
+          if (fromIdx < toIdx) {
+            if (ci > fromIdx && ci <= toIdx) ni = ci - 1;
+          } else {
+            if (ci >= toIdx && ci < fromIdx) ni = ci + 1;
+          }
+          newSet.add(ni);
+        });
+        if (wasChecked) newSet.add(toIdx);
+        checkedSets[key] = newSet;
+
+        renderChecklist(key);
+      }
+    });
+
+    body.appendChild(d);
+  });
+
+  // ── checklist-body 자체에도 dragover/dragleave 등록 (빈 공간 처리) ──
+  body.addEventListener('dragover', (e) => {
+    const rect = body.getBoundingClientRect();
+    const ZONE = 80;
+    const y = e.clientY;
+    if (y < rect.top + ZONE) {
+      startAutoScroll(-1);
+    } else if (y > rect.bottom - ZONE) {
+      startAutoScroll(1);
+    } else {
+      stopAutoScroll();
+    }
+  });
+
+  body.addEventListener('dragleave', (e) => {
+    // 목록 영역 완전히 벗어나면 정지
+    const rect = body.getBoundingClientRect();
+    if (e.clientY < rect.top || e.clientY > rect.bottom) {
+      stopAutoScroll();
+    }
+  });
+
+  const addRow = document.createElement('div');
+  addRow.className = 'add-item-row';
+  addRow.innerHTML = `<button class="add-item-btn" onclick="addItem('${key}')">+ 항목 추가</button>`;
+  body.appendChild(addRow);
+}
+
+function addItem(key) {
+  templates[key].push({ text: '새 항목', badge: '' });
+  saveTemplates();
+  renderChecklist(key);
+  setTimeout(() => {
+    const items = document.querySelectorAll('.check-item');
+    const last = items[items.length - 1];
+    if (last) last.querySelector('.edit-btn').click();
+  }, 50);
+}
+
+function loadTemplate(el, key) {
+  document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  checkedSets[key] = new Set();
+  renderChecklist(key);
+}
+
+function showDepartDone() {
+  const banner = document.createElement('div');
+  banner.className = 'depart-done-banner';
+  banner.innerHTML = `
+    <div class="depart-done-title">출발 시간이에요!</div>
+    <div class="depart-done-desc">준비 잘 하셨나요?<br>오늘도 완벽하게 출발해요.</div>
+    <button class="depart-done-btn" onclick="closeDepartDone()">확인</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+function closeDepartDone() {
+  const banner = document.querySelector('.depart-done-banner');
+  if (!banner) return;
+  banner.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+  banner.style.transform = 'translateY(-100%)';
+  banner.style.opacity = '0';
+  setTimeout(() => {
+    if (banner.parentNode) banner.parentNode.removeChild(banner);
+  }, 300);
+
+  departHour = null;
+  departMin  = null;
+  window._departSetAt = null;
+  window._departDoneShown = false;
+  localStorage.removeItem('readygo_depart');
+  localStorage.removeItem('readygo_depart_setat');
+
+  const fillEl = document.getElementById('progressFill');
+  if (fillEl) { fillEl.style.width = '0%'; fillEl.style.filter = 'none'; }
+  const cdNumEl = document.getElementById('countdown');
+  if (cdNumEl) cdNumEl.classList.remove('urgent');
+  const endEl = document.getElementById('progressEnd');
+  if (endEl) endEl.textContent = '—';
+  const depLabel = document.getElementById('departLabel');
+  if (depLabel) depLabel.textContent = '시간 설정';
+  const homeCD = document.getElementById('homeCountdown');
+  if (homeCD) homeCD.textContent = '—';
+}
+
+function showDragTooltip() {
+  if (localStorage.getItem('readygo_drag_tooltip_seen')) return;
+  const tip = document.createElement('div');
+  tip.className = 'drag-tooltip';
+  tip.innerHTML = `
+    <div class="drag-tooltip-icon">⠿</div>
+    <div class="drag-tooltip-text">
+      <strong>순서 바꾸는 법</strong>
+      왼쪽 점 아이콘을 잡고 위아래로 드래그해보세요
+    </div>
+    <button class="drag-tooltip-close" onclick="dismissDragTooltip()">확인</button>
+  `;
+  document.body.appendChild(tip);
+  setTimeout(() => dismissDragTooltip(), 5000);
+}
+
+function dismissDragTooltip() {
+  const tip = document.querySelector('.drag-tooltip');
+  if (!tip) return;
+  tip.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+  tip.style.transform = 'translateY(100%)';
+  tip.style.opacity = '0';
+  setTimeout(() => { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 300);
+  localStorage.setItem('readygo_drag_tooltip_seen', '1');
+}
+
+function startRoutine() {
+  const tpl = templates[currentKey] || [];
+  const set = checkedSets[currentKey];
+  const items = (set && set.size > 0)
+    ? tpl.filter((_, i) => set.has(i)).map(i => i.text)
+    : tpl.map(i => i.text);
+
+  if (items.length === 0) return;
+
+  buildBubbles(items);
+  switchView('home');
+}
+
+let physBubbles = [];
+let physRAF = null;
+
+function startPhysLoop() {
+  if (physRAF) cancelAnimationFrame(physRAF);
+  if (!window._physLoop) return;
+  physRAF = requestAnimationFrame(window._physLoop);
+}
+
+const GRADIENTS = [
+  'radial-gradient(circle at 38% 32%, rgba(210,205,255,0.9) 0%, rgba(175,165,248,0.75) 55%, rgba(155,145,235,0.5) 100%)',
+  'radial-gradient(circle at 38% 32%, rgba(195,220,255,0.9) 0%, rgba(155,185,248,0.75) 55%, rgba(130,165,235,0.5) 100%)',
+  'radial-gradient(circle at 38% 32%, rgba(225,205,255,0.9) 0%, rgba(190,165,248,0.75) 55%, rgba(168,145,235,0.5) 100%)',
+  'radial-gradient(circle at 38% 32%, rgba(195,235,255,0.9) 0%, rgba(155,200,248,0.75) 55%, rgba(130,178,235,0.5) 100%)',
+];
+const BORDERS = [
+  'rgba(255,255,255,0.85)',
+  'rgba(255,255,255,0.85)',
+  'rgba(255,255,255,0.85)',
+  'rgba(255,255,255,0.85)',
+];
+
+function buildBubbles(items) {
+  doneCount = 0;
+  totalBubbles = items.length;
+  if (physRAF) { cancelAnimationFrame(physRAF); physRAF = null; }
+  physBubbles = [];
+
+  const stage = document.getElementById('bubbleStage');
+  stage.innerHTML = '';
+  stage.style.padding = '0';
+  stage.style.gap = '0';
+
+  const n = items.length;
+
+  requestAnimationFrame(() => {
+    const W = stage.clientWidth;
+    const H = stage.clientHeight;
+    const PAD = W * 0.03;
+
+    const base = Math.min(W, H);
+    const sizeMap = n <= 2
+      ? [base * 0.44, base * 0.30, base * 0.22]
+      : n <= 4
+      ? [base * 0.38, base * 0.26, base * 0.20]
+      : n <= 6
+      ? [base * 0.32, base * 0.23, base * 0.17]
+      : [base * 0.27, base * 0.20, base * 0.15];
+    const sizes = items.map((_, i) => i === 0 ? sizeMap[0] : i <= 2 ? sizeMap[1] : sizeMap[2]);
+
+    function placeWithoutOverlap(r) {
+      let tries = 0;
+      while (tries++ < 400) {
+        const x = PAD + r + Math.random() * (W - 2*r - 2*PAD);
+        const y = PAD + r + Math.random() * (H - 2*r - 2*PAD);
+        let ok = true;
+        for (const pb of physBubbles) {
+          const dx = x - pb.x, dy = y - pb.y;
+          if (Math.sqrt(dx*dx+dy*dy) < r + pb.r + 6) { ok = false; break; }
+        }
+        if (ok) return {x, y};
+      }
+      return {
+        x: PAD + r + Math.random() * Math.max(0, W - 2*r - 2*PAD),
+        y: PAD + r + Math.random() * Math.max(0, H - 2*r - 2*PAD),
+      };
+    }
+
+    items.forEach((text, idx) => {
+      const r = sizes[idx] / 2;
+      const gi = idx % GRADIENTS.length;
+      const pos = placeWithoutOverlap(r);
+      const speed = 0.25 + Math.random() * 0.2;
+      const angle = Math.random() * Math.PI * 2;
+
+      const el = makeBubble(text, idx, '');
+      el.style.width = sizes[idx] + 'px';
+      el.style.height = sizes[idx] + 'px';
+      el.style.background = GRADIENTS[gi];
+      el.style.border = '1.5px solid ' + BORDERS[gi];
+      el.style.boxShadow = '0 6px 24px rgba(100,110,190,0.18), 0 2px 8px rgba(100,110,190,0.08)';
+      el.style.left = (pos.x - r) + 'px';
+      el.style.top  = (pos.y - r) + 'px';
+      el.style.transition = 'none';
+      el.style.animationDelay = (idx * 0.1) + 's';
+      const lbl = el.querySelector('.task-label');
+      lbl.style.fontSize = Math.max(10, Math.round(sizes[idx] * 0.088)) + 'px';
+      stage.appendChild(el);
+
+      physBubbles.push({
+        el, r, x: pos.x, y: pos.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+      });
+    });
+
+    window._physLoop = function loop() {
+      const W2 = stage.clientWidth;
+      const H2 = stage.clientHeight;
+      const pb = physBubbles;
+
+      for (const b of pb) {
+        if (b.el.classList.contains('pressing')) continue;
+        b.x += b.vx;
+        b.y += b.vy;
+        if (b.x - b.r < PAD)       { b.x = PAD + b.r;      b.vx = Math.abs(b.vx); }
+        if (b.x + b.r > W2 - PAD)  { b.x = W2 - PAD - b.r; b.vx = -Math.abs(b.vx); }
+        if (b.y - b.r < PAD)       { b.y = PAD + b.r;      b.vy = Math.abs(b.vy); }
+        if (b.y + b.r > H2 - PAD)  { b.y = H2 - PAD - b.r; b.vy = -Math.abs(b.vy); }
+      }
+
+      for (let i = 0; i < pb.length; i++) {
+        for (let j = i+1; j < pb.length; j++) {
+          const a = pb[i], b2 = pb[j];
+          const dx = b2.x - a.x, dy = b2.y - a.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const minDist = a.r + b2.r + 4;
+          if (dist < minDist && dist > 0.01) {
+            const nx = dx / dist, ny = dy / dist;
+            const overlap = (minDist - dist) / 2;
+            a.x -= nx * overlap; a.y -= ny * overlap;
+            b2.x += nx * overlap; b2.y += ny * overlap;
+            const dvx = a.vx - b2.vx, dvy = a.vy - b2.vy;
+            const dot = dvx*nx + dvy*ny;
+            if (dot > 0) {
+              a.vx -= dot * nx; a.vy -= dot * ny;
+              b2.vx += dot * nx; b2.vy += dot * ny;
+            }
+          }
+        }
+      }
+
+      for (const b of pb) {
+        b.el.style.left = (b.x - b.r) + 'px';
+        b.el.style.top  = (b.y - b.r) + 'px';
+      }
+
+      physRAF = requestAnimationFrame(window._physLoop);
+    }
+
+    startPhysLoop();
+  });
+
+  document.getElementById('homeSubtitle').textContent = '지금 해야 할 것';
+  document.getElementById('completeOverlay').classList.remove('show');
+}
+
+function makeBubble(text, idx, sizeClass) {
+  const id = 'bubble_' + idx;
+  const div = document.createElement('div');
+  div.className = 'bubble ' + sizeClass;
+  div.id = id;
+  div.innerHTML = `
+    <div class="done-ring"></div>
+    <span class="task-label">${text}</span>
+    <span class="done-check">✓</span>
+  `;
+
+  let pressTimer   = null;
+  let pressing     = false;
+  let menuEl       = null;   // 현재 표시 중인 액션 메뉴
+  let hoveredBtn   = null;   // 현재 hover된 버튼
+
+  // ── 액션 메뉴 생성 ──
+  function showActionMenu() {
+    if (menuEl) return;
+
+    // 버블 위치 기준으로 stage 내 좌표 계산
+    const stage   = document.getElementById('bubbleStage');
+    const bRect   = div.getBoundingClientRect();
+    const sRect   = stage.getBoundingClientRect();
+    const cx      = bRect.left - sRect.left + bRect.width / 2;
+    const cy      = bRect.top  - sRect.top  + bRect.height / 2;
+    const r       = bRect.width / 2;
+
+    menuEl = document.createElement('div');
+    menuEl.className = 'bubble-action-menu';
+
+    // 버블 위쪽 중앙에 배치 — 버블 top에서 버튼 반지름+여백만큼 위
+    const menuY = cy - r - 20;   // 버블 중심 - 반지름 - 여백(버튼 중심 기준)
+    menuEl.style.left = cx + 'px';
+    menuEl.style.top  = menuY + 'px';
+
+    // 카메라 버튼
+    const camBtn = document.createElement('div');
+    camBtn.className = 'bubble-action-btn action-camera';
+    camBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+    camBtn.title = '사진 찍고 완료';
+
+    // 체크 버튼
+    const chkBtn = document.createElement('div');
+    chkBtn.className = 'bubble-action-btn action-check';
+    chkBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+    chkBtn.title = '바로 완료';
+
+    menuEl.appendChild(camBtn);
+    menuEl.appendChild(chkBtn);
+    stage.appendChild(menuEl);
+
+    // 마우스/터치 이동 중 hover 감지
+    function getHoveredBtn(clientX, clientY) {
+      const camR = camBtn.getBoundingClientRect();
+      const chkR = chkBtn.getBoundingClientRect();
+      if (clientX >= camR.left && clientX <= camR.right &&
+          clientY >= camR.top  && clientY <= camR.bottom) return 'camera';
+      if (clientX >= chkR.left && clientX <= chkR.right &&
+          clientY >= chkR.top  && clientY <= chkR.bottom) return 'check';
+      return null;
+    }
+
+    function updateHover(clientX, clientY) {
+      const hit = getHoveredBtn(clientX, clientY);
+      if (hit !== hoveredBtn) {
+        hoveredBtn = hit;
+        camBtn.classList.toggle('hovered', hit === 'camera');
+        chkBtn.classList.toggle('hovered', hit === 'check');
+      }
+    }
+
+    // touch move 리스너 (전역 — 버블 밖으로 나가도 추적)
+    function onTouchMove(e) {
+      const t = e.touches[0];
+      updateHover(t.clientX, t.clientY);
+    }
+    function onTouchEnd(e) {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend',  onTouchEnd);
+      const t = e.changedTouches[0];
+      const hit = getHoveredBtn(t.clientX, t.clientY);
+      dismissMenu();
+      if      (hit === 'camera') openCamera(id);
+      else if (hit === 'check')  completeBubble(id, null);
+    }
+
+    // mouse move 리스너
+    function onMouseMove(e) {
+      updateHover(e.clientX, e.clientY);
+    }
+    function onMouseUp(e) {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup',   onMouseUp);
+      const hit = getHoveredBtn(e.clientX, e.clientY);
+      dismissMenu();
+      if      (hit === 'camera') openCamera(id);
+      else if (hit === 'check')  completeBubble(id, null);
+    }
+
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
+    document.addEventListener('touchend',  onTouchEnd);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup',   onMouseUp);
+  }
+
+  function dismissMenu() {
+    if (!menuEl) return;
+    if (menuEl.parentNode) menuEl.parentNode.removeChild(menuEl);
+    menuEl     = null;
+    hoveredBtn = null;
+    div.classList.remove('pressing');
+  }
+
+  let _pressStartX = 0, _pressStartY = 0;
+
+  // ── 꾹 누르기 ──
+  const startPress = (clientX, clientY) => {
+    if (div.classList.contains('completing') || div.classList.contains('vanish')) return;
+    _pressStartX = clientX;
+    _pressStartY = clientY;
+    pressing = true;
+    div.classList.add('pressing');
+    pressTimer = setTimeout(() => {
+      if (pressing) {
+        div.classList.remove('pressing');
+        showActionMenu();
+        pressing = false;
+      }
+    }, 600);
+  };
+
+  const cancelPress = () => {
+    if (!pressing) return;
+    pressing = false;
+    div.classList.remove('pressing');
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    // 메뉴가 이미 떠 있으면 cancelPress로 닫지 않음 (터치 end/up에서 처리)
+  };
+
+  div.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // iOS 기본 컨텍스트 메뉴 / 텍스트 선택 차단
+    const t = e.touches[0];
+    startPress(t.clientX, t.clientY);
+  }, { passive: false });
+
+  div.addEventListener('touchmove', (e) => {
+    if (!pressing) return;
+    // 10px 이상 움직였을 때만 취소 (살짝 떨림은 허용)
+    const t = e.touches[0];
+    const dx = t.clientX - _pressStartX;
+    const dy = t.clientY - _pressStartY;
+    if (Math.sqrt(dx*dx + dy*dy) > 10) cancelPress();
+  }, { passive: true });
+
+  div.addEventListener('touchend', (e) => {
+    if (!menuEl) cancelPress();
+  });
+
+  div.addEventListener('touchcancel', () => {
+    cancelPress();
+    dismissMenu();
+  });
+
+  div.addEventListener('mousedown', (e) => {
+    startPress(e.clientX, e.clientY);
+  });
+
+  div.addEventListener('mouseup', () => {
+    if (!menuEl) cancelPress();
+  });
+
+  div.addEventListener('mouseleave', () => {
+    if (!menuEl) cancelPress();
+  });
+
+  return div;
+}
+
+function openCamera(id) {
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains('completing') || el.classList.contains('vanish')) return;
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const photoData = ev.target.result;
+      completeBubble(id, photoData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.addEventListener('focus', function onFocus() {
+    setTimeout(() => {
+      if (document.body.contains(input)) document.body.removeChild(input);
+      window.removeEventListener('focus', onFocus);
+    }, 500);
+  });
+
+  input.click();
+}
+
+function completeBubble(id, photoData) {
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains('completing') || el.classList.contains('vanish')) return;
+
+  const labelEl = el.querySelector('.task-label');
+  if (labelEl) {
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    saveArchiveItem({
+      label: labelEl.textContent.trim(),
+      time: timeStr,
+      photo: photoData || null
+    });
+  }
+
+  el.classList.add('completing');
+  setTimeout(() => {
+    el.classList.add('vanish');
+    physBubbles = physBubbles.filter(b => b.el.id !== id);
+    doneCount++;
+    if (doneCount >= totalBubbles) {
+      if (physRAF) { cancelAnimationFrame(physRAF); physRAF = null; }
+      setTimeout(() => document.getElementById('completeOverlay').classList.add('show'), 500);
+    }
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 420);
+  }, 420);
+}
+
+function closeOverlay() {
+  document.getElementById('completeOverlay').classList.remove('show');
+  switchView('archive');
+}
+
+function switchView(name) {
+  if (name !== 'home' && physRAF) {
+    cancelAnimationFrame(physRAF);
+    physRAF = null;
+  }
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'home' && physBubbles.length > 0 && !physRAF) {
+    startPhysLoop();
+  }
+  if (name === 'archive') {
+    renderArchive();
+  }
+  if (name === 'checklist') {
+    setTimeout(showDragTooltip, 600);
+  }
+}
+
+function updateTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const t = h + ':' + m;
+  document.getElementById('clock').textContent = t;
+  document.getElementById('statusTime').textContent = t;
+  if (departHour === null) {
+    document.getElementById('countdown').textContent = '—';
+    document.getElementById('departLabel').textContent = '시간 설정';
+    const hcd = document.getElementById('homeCountdown');
+    if (hcd) hcd.textContent = '—';
+    const pf = document.getElementById('progressFill');
+    if (pf) pf.style.width = '0%';
+    const pe = document.getElementById('progressEnd');
+    if (pe) pe.textContent = '—';
+    return;
+  }
+  const depart = new Date();
+  depart.setHours(departHour, departMin, 0, 0);
+
+  if (depart < now) {
+    if (!window._departDoneShown) {
+      window._departDoneShown = true;
+      const fillEl = document.getElementById('progressFill');
+      if (fillEl) fillEl.style.width = '100%';
+      showDepartDone();
+    }
+    return;
+  }
+
+  const diffSec = Math.max(0, Math.floor((depart - now) / 1000));
+  const hours = Math.floor(diffSec / 3600);
+  const mins  = Math.floor((diffSec % 3600) / 60);
+  const secs  = diffSec % 60;
+
+  const cdEl = document.getElementById('countdown');
+  const homeCD = document.getElementById('homeCountdown');
+  if (diffSec === 0) {
+    cdEl.innerHTML = '출발!';
+    if (homeCD) homeCD.innerHTML = '출발!';
+  } else if (hours > 0) {
+    cdEl.innerHTML = hours + '<span>시간</span> ' + String(mins).padStart(2,'0') + '<span>분</span> ' + String(secs).padStart(2,'0') + '<span>초</span>';
+    if (homeCD) homeCD.innerHTML = hours + '<span style="font-size:11px;color:var(--sub);margin-left:1px;">h</span> ' + String(mins).padStart(2,'0') + '<span style="font-size:11px;color:var(--sub);margin-left:1px;">m</span>';
+  } else if (mins > 0) {
+    cdEl.innerHTML = mins + '<span>분</span> ' + String(secs).padStart(2,'0') + '<span>초</span>';
+    if (homeCD) homeCD.innerHTML = mins + '<span style="font-size:11px;color:var(--sub);margin-left:1px;">분</span> ' + String(secs).padStart(2,'0') + '<span style="font-size:11px;color:var(--sub);margin-left:1px;">초</span>';
+  } else {
+    cdEl.innerHTML = secs + '<span>초</span>';
+    if (homeCD) homeCD.innerHTML = secs + '<span style="font-size:11px;color:var(--sub);margin-left:1px;">초</span>';
+  }
+
+  const fillEl  = document.getElementById('progressFill');
+  const cdNumEl = document.getElementById('countdown');
+  const endEl   = document.getElementById('progressEnd');
+
+  if (endEl) endEl.textContent = String(departHour).padStart(2,'0') + ':' + String(departMin).padStart(2,'0');
+
+  if (!window._departSetAt) {
+    if (fillEl) fillEl.style.width = '0%';
+    return;
+  }
+
+  const setAt = window._departSetAt;
+  const totalSec = Math.max(1, (depart.getTime() - setAt) / 1000);
+  const elapsedSec = Math.max(0, (now.getTime() - setAt) / 1000);
+  const pct = Math.min(100, Math.round((elapsedSec / totalSec) * 100));
+
+  if (fillEl) fillEl.style.width = pct + '%';
+
+  if (pct >= 100 && !window._departDoneShown) {
+    window._departDoneShown = true;
+    showDepartDone();
+  }
+
+  if (pct >= 90 && pct < 100) {
+    if (fillEl)  fillEl.style.filter = 'brightness(1.2) saturate(1.3)';
+    if (cdNumEl) cdNumEl.classList.add('urgent');
+  } else {
+    if (fillEl)  fillEl.style.filter = 'none';
+    if (cdNumEl) cdNumEl.classList.remove('urgent');
+  }
+
+  document.getElementById('departLabel').textContent =
+    String(departHour).padStart(2,'0') + ':' + String(departMin).padStart(2,'0');
+}
+
+let departHour = null;
+let departMin  = null;
+
+function loadDepartTime() {
+  const saved = localStorage.getItem('readygo_depart');
+  if (saved) {
+    const [h, m] = saved.split(':').map(Number);
+    departHour = h; departMin = m;
+  }
+  const setAt = localStorage.getItem('readygo_depart_setat');
+  window._departSetAt = setAt ? parseInt(setAt) : null;
+}
+
+function saveDepartTime(h, m) {
+  departHour = h; departMin = m;
+  localStorage.setItem('readygo_depart', h + ':' + m);
+  const setAt = Date.now();
+  localStorage.setItem('readygo_depart_setat', String(setAt));
+  window._departSetAt = setAt;
+  updateTime();
+}
+
+function openDepartSetting() {
+  let selH = departHour !== null ? departHour : new Date().getHours();
+  let selM = departMin  !== null ? departMin  : 0;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML = `
+    <div class="sheet-handle"></div>
+    <div style="padding:0 0 20px;"><div class="sheet-title">출발 시간 설정</div></div>
+    <div style="display:flex;justify-content:center;align-items:center;gap:0;position:relative;height:216px;">
+      <div style="position:absolute;left:50%;transform:translateX(-50%);width:220px;height:52px;
+                  background:#f0eeff;border-radius:14px;pointer-events:none;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:80px;
+                  background:linear-gradient(to bottom,#fff 0%,transparent 100%);pointer-events:none;z-index:2;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:80px;
+                  background:linear-gradient(to top,#fff 0%,transparent 100%);pointer-events:none;z-index:2;"></div>
+      <div id="drumH" style="width:100px;height:216px;overflow:hidden;position:relative;cursor:pointer;"></div>
+      <div style="font-size:28px;font-weight:300;color:#ccc;width:20px;text-align:center;z-index:1;">:</div>
+      <div id="drumM" style="width:100px;height:216px;overflow:hidden;position:relative;cursor:pointer;"></div>
+    </div>
+    <div class="sheet-btn-row">
+      <button id="dCancel" class="sheet-btn secondary">취소</button>
+      <button id="dSave" class="sheet-btn primary">저장</button>
+    </div>`;
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  const ITEM_H = 52;
+
+  function buildDrum(containerId, count, initVal, fmtFn) {
+    const container = document.getElementById(containerId);
+    let current = initVal;
+    let startY = 0, startVal = 0, isDragging = false, velocity = 0, lastY = 0, lastTime = 0;
+
+    const inner = document.createElement('div');
+    inner.style.cssText = 'position:absolute;left:0;right:0;will-change:transform;';
+
+    const COPIES = 3;
+    const total  = count * COPIES;
+    const offset = count;
+
+    for (let i = 0; i < total; i++) {
+      const v = i % count;
+      const div = document.createElement('div');
+      div.style.cssText = `height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;
+        font-size:26px;font-weight:300;color:#2a2d4a;user-select:none;`;
+      div.textContent = fmtFn(v);
+      inner.appendChild(div);
+    }
+    container.appendChild(inner);
+
+    function getTopForVal(val) {
+      const centerY = 216 / 2 - ITEM_H / 2;
+      return centerY - (offset + val) * ITEM_H;
+    }
+
+    let currentTop = getTopForVal(current);
+    inner.style.transform = `translateY(${currentTop}px)`;
+    updateOpacity();
+
+    function updateOpacity() {
+      const centerY = 216 / 2;
+      Array.from(inner.children).forEach((ch, i) => {
+        const itemCenter = currentTop + i * ITEM_H + ITEM_H / 2;
+        const dist = Math.abs(itemCenter - centerY);
+        if (dist < ITEM_H * 0.5) {
+          ch.style.opacity = '1';
+          ch.style.fontSize = '30px';
+          ch.style.fontWeight = '400';
+          ch.style.color = '#2a2d4a';
+        } else if (dist < ITEM_H * 1.5) {
+          ch.style.opacity = '0.4';
+          ch.style.fontSize = '24px';
+          ch.style.fontWeight = '300';
+          ch.style.color = '#888';
+        } else {
+          ch.style.opacity = '0.15';
+          ch.style.fontSize = '20px';
+          ch.style.fontWeight = '300';
+          ch.style.color = '#ccc';
+        }
+      });
+    }
+
+    function snapToNearest(animated) {
+      const centerY = 216 / 2 - ITEM_H / 2;
+      const rawIdx = (-currentTop + centerY) / ITEM_H;
+      const snapIdx = Math.round(rawIdx);
+      current = ((snapIdx % count) + count) % count;
+      const snapTop = centerY - snapIdx * ITEM_H;
+
+      if (animated) {
+        inner.style.transition = 'transform 0.28s cubic-bezier(0.33,1,0.68,1)';
+      } else {
+        inner.style.transition = 'none';
+      }
+      currentTop = snapTop;
+      inner.style.transform = `translateY(${snapTop}px)`;
+      setTimeout(updateOpacity, 10);
+    }
+
+    function clampScroll() {
+      const centerY = 216 / 2 - ITEM_H / 2;
+      const minTop = centerY - (offset + count - 1) * ITEM_H - ITEM_H * 0.5;
+      const maxTop = centerY - offset * ITEM_H + ITEM_H * 0.5;
+      if (currentTop < minTop || currentTop > maxTop) {
+        inner.style.transition = 'none';
+        const normVal = ((current % count) + count) % count;
+        currentTop = centerY - (offset + normVal) * ITEM_H;
+        inner.style.transform = `translateY(${currentTop}px)`;
+      }
+    }
+
+    container.addEventListener('touchstart', (e) => {
+      inner.style.transition = 'none';
+      startY = e.touches[0].clientY;
+      lastY  = startY;
+      lastTime = Date.now();
+      velocity = 0;
+      isDragging = true;
+    }, {passive:true});
+
+    container.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const y = e.touches[0].clientY;
+      const now = Date.now();
+      velocity = (y - lastY) / (now - lastTime + 1) * 16;
+      lastY = y; lastTime = now;
+      currentTop += y - startY;
+      startY = y;
+      inner.style.transform = `translateY(${currentTop}px)`;
+      updateOpacity();
+    }, {passive:true});
+
+    container.addEventListener('touchend', () => {
+      isDragging = false;
+      let raf;
+      function inertia() {
+        if (Math.abs(velocity) < 0.5) { snapToNearest(true); return; }
+        currentTop += velocity;
+        velocity  *= 0.92;
+        inner.style.transform = `translateY(${currentTop}px)`;
+        updateOpacity();
+        clampScroll();
+        raf = requestAnimationFrame(inertia);
+      }
+      inertia();
+    });
+
+    container.addEventListener('mousedown', (e) => {
+      inner.style.transition = 'none';
+      startY = e.clientY; lastY = startY; lastTime = Date.now(); velocity = 0; isDragging = true;
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const now = Date.now();
+      velocity = (e.clientY - lastY) / (now - lastTime + 1) * 16;
+      lastY = e.clientY; lastTime = now;
+      currentTop += e.clientY - startY;
+      startY = e.clientY;
+      inner.style.transform = `translateY(${currentTop}px)`;
+      updateOpacity();
+    });
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      snapToNearest(true);
+    });
+
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      inner.style.transition = 'none';
+      currentTop -= e.deltaY * 0.5;
+      inner.style.transform = `translateY(${currentTop}px)`;
+      updateOpacity();
+      clearTimeout(container._wheelTimer);
+      container._wheelTimer = setTimeout(() => snapToNearest(true), 80);
+    }, {passive:false});
+
+    return { getVal: () => current };
+  }
+
+  const dH = buildDrum('drumH', 24, selH, (v) => String(v).padStart(2,'0'));
+  const dM = buildDrum('drumM', 60, selM, (v) => String(v).padStart(2,'0'));
+
+  document.getElementById('dSave').onclick = () => {
+    saveDepartTime(dH.getVal(), dM.getVal());
+    document.body.removeChild(overlay);
+  };
+  document.getElementById('dCancel').onclick = () => document.body.removeChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) document.body.removeChild(overlay); });
+}
+
+const ARCHIVE_KEY = 'readygo_archive';
+const ARCHIVE_DATE_KEY = 'readygo_archive_date';
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function loadArchive() {
+  const savedDate = localStorage.getItem(ARCHIVE_DATE_KEY);
+  if (savedDate !== todayStr()) {
+    localStorage.removeItem(ARCHIVE_KEY);
+    localStorage.setItem(ARCHIVE_DATE_KEY, todayStr());
+  }
+  return JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]');
+}
+
+function saveArchiveItem(item) {
+  const list = loadArchive();
+  list.push(item);
+  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(list));
+  localStorage.setItem(ARCHIVE_DATE_KEY, todayStr());
+}
+
+function confirmClearArchive() {
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-overlay';
+  overlay.innerHTML = `
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">아카이브 초기화</div>
+      <div class="sheet-sub">오늘 기록된 모든 완료 항목이 삭제돼요. 계속할까요?</div>
+      <div class="sheet-btn-row">
+        <button id="clearNo" class="sheet-btn secondary">취소</button>
+        <button id="clearYes" class="sheet-btn primary">삭제할게요</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('clearYes').onclick = () => {
+    localStorage.removeItem('readygo_archive');
+    localStorage.setItem('readygo_archive_date', todayStr());
+    renderArchive();
+    document.body.removeChild(overlay);
+  };
+  document.getElementById('clearNo').onclick = () => document.body.removeChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
+}
+
+function renderArchive() {
+  const scroll = document.getElementById('archiveScroll');
+  const list = loadArchive();
+  const sub = document.getElementById('archiveSub');
+
+  if (list.length === 0) {
+    sub.textContent = '오늘 완료한 루틴이 없어요.';
+    scroll.innerHTML = `
+      <div class="archive-empty">
+        <div class="archive-empty-orb"><svg style="width:28px;height:28px;stroke:var(--hint);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
+        <div class="archive-empty-text">아직 완료한 항목이 없어요.<br>루틴을 마치면 여기에 기록돼요.</div>
+      </div>`;
+    return;
+  }
+
+  sub.textContent = '다 했어요, 걱정 마세요.';
+  const iconSVGs = {
+    flame:    `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M12 2c0 6-6 8-6 14a6 6 0 0 0 12 0c0-6-6-8-6-14z"/><path d="M12 12c0 3-2 4-2 7a2 2 0 0 0 4 0c0-3-2-4-2-7z"/></svg>`,
+    door:     `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M13 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-5-5z"/><circle cx="16" cy="14" r="1" fill="var(--accent)"/></svg>`,
+    bulb:     `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.6-1.4 4.9-3.5 6.2L15 17H9l-.5-1.8A7 7 0 0 1 12 2z"/></svg>`,
+    wallet:   `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1" fill="var(--accent)"/></svg>`,
+    key:      `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M21 2l-9.6 9.6M15 8l2 2"/></svg>`,
+    briefcase:`<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/><path d="M2 12h20"/></svg>`,
+    plane:    `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>`,
+    book:     `<svg style="width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  };
+  const iconKeys = ['flame','door','bulb','wallet','key','briefcase','plane','book'];
+
+  const banner = `
+    <div class="reassure-card">
+      <div class="reassure-title">오늘 외출 준비 완료</div>
+      <div class="reassure-desc">모든 항목을 확인하고 나왔어요. 잊은 거 없어요.</div>
+    </div>`;
+
+  const stampSVG = `<svg style="width:13px;height:13px;stroke:var(--green);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+  const cards = list.map((item, i) => `
+    <div class="photo-card">
+      <div class="photo-thumb">
+        ${item.photo
+          ? `<img src="${item.photo}" alt="${item.label}">`
+          : `<div class="photo-thumb-icon">${iconSVGs[iconKeys[i % iconKeys.length]]}</div>`
+        }
+      </div>
+      <div class="photo-info">
+        <div class="photo-title">${item.label}</div>
+        <div class="photo-time">${item.time} 완료</div>
+        <div class="photo-stamp">${stampSVG} 완료 확인됨</div>
+      </div>
+    </div>`).join('');
+
+  scroll.innerHTML = banner + cards;
+}
+
+loadSavedTemplates();
+loadDepartTime();
+renderChecklist('morning');
+renderArchive();
+updateTime();
+setInterval(updateTime, 1000);
+
+setInterval(() => {
+  const saved = localStorage.getItem(ARCHIVE_DATE_KEY);
+  if (saved && saved !== todayStr()) {
+    localStorage.removeItem(ARCHIVE_KEY);
+    localStorage.setItem(ARCHIVE_DATE_KEY, todayStr());
+    renderArchive();
+  }
+}, 60000);
+</script>
+</body>
+</html>
