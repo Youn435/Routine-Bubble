@@ -1271,7 +1271,7 @@ function buildBubbles(items) {
       const pb = physBubbles;
 
       for (const b of pb) {
-        if (b.el.classList.contains('pressing')) continue;
+        if (b.el.classList.contains('pressing') || b.el.classList.contains('frozen')) continue;
         b.x += b.vx;
         b.y += b.vy;
         if (b.x - b.r < PAD)       { b.x = PAD + b.r;      b.vx = Math.abs(b.vx); }
@@ -1327,114 +1327,106 @@ function makeBubble(text, idx, sizeClass) {
     <span class="done-check">✓</span>
   `;
 
-  let pressTimer   = null;
-  let pressing     = false;
-  let menuEl       = null;   // 현재 표시 중인 액션 메뉴
-  let hoveredBtn   = null;   // 현재 hover된 버튼
+  let pressTimer = null;
+  let pressing   = false;
+  let menuEl     = null;
+  let _pressStartX = 0, _pressStartY = 0;
 
   // ── 액션 메뉴 생성 ──
   function showActionMenu() {
     if (menuEl) return;
 
-    // 버블 위치 기준으로 stage 내 좌표 계산
-    const stage   = document.getElementById('bubbleStage');
-    const bRect   = div.getBoundingClientRect();
-    const sRect   = stage.getBoundingClientRect();
-    const cx      = bRect.left - sRect.left + bRect.width / 2;
-    const cy      = bRect.top  - sRect.top  + bRect.height / 2;
-    const r       = bRect.width / 2;
+    const stage  = document.getElementById('bubbleStage');
+    const bRect  = div.getBoundingClientRect();
+    const sRect  = stage.getBoundingClientRect();
+    const cx     = bRect.left - sRect.left + bRect.width / 2;
+    const cy     = bRect.top  - sRect.top  + bRect.height / 2;
+    const r      = bRect.width / 2;
+
+    // 버블 정지
+    div.classList.add('frozen');
 
     menuEl = document.createElement('div');
     menuEl.className = 'bubble-action-menu';
-
-    // 버블 위쪽 중앙에 배치 — 버블 top에서 버튼 반지름+여백만큼 위
-    const menuY = cy - r - 20;   // 버블 중심 - 반지름 - 여백(버튼 중심 기준)
     menuEl.style.left = cx + 'px';
-    menuEl.style.top  = menuY + 'px';
+    menuEl.style.top  = (cy - r - 20) + 'px';
 
     // 카메라 버튼
     const camBtn = document.createElement('div');
     camBtn.className = 'bubble-action-btn action-camera';
     camBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
-    camBtn.title = '사진 찍고 완료';
 
     // 체크 버튼
     const chkBtn = document.createElement('div');
     chkBtn.className = 'bubble-action-btn action-check';
     chkBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
-    chkBtn.title = '바로 완료';
 
     menuEl.appendChild(camBtn);
     menuEl.appendChild(chkBtn);
     stage.appendChild(menuEl);
 
-    // 마우스/터치 이동 중 hover 감지
-    function getHoveredBtn(clientX, clientY) {
-      const camR = camBtn.getBoundingClientRect();
-      const chkR = chkBtn.getBoundingClientRect();
-      if (clientX >= camR.left && clientX <= camR.right &&
-          clientY >= camR.top  && clientY <= camR.bottom) return 'camera';
-      if (clientX >= chkR.left && clientX <= chkR.right &&
-          clientY >= chkR.top  && clientY <= chkR.bottom) return 'check';
-      return null;
-    }
+    // ── 버튼에 직접 이벤트 — iOS 제스처 컨텍스트 확보 ──
+    camBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
 
-    function updateHover(clientX, clientY) {
-      const hit = getHoveredBtn(clientX, clientY);
-      if (hit !== hoveredBtn) {
-        hoveredBtn = hit;
-        camBtn.classList.toggle('hovered', hit === 'camera');
-        chkBtn.classList.toggle('hovered', hit === 'check');
+    camBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissMenu();
+      openCamera(id);
+    }, { passive: false });
+
+    camBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissMenu();
+      openCamera(id);
+    });
+
+    chkBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+
+    chkBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissMenu();
+      completeBubble(id, null);
+    }, { passive: false });
+
+    chkBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissMenu();
+      completeBubble(id, null);
+    });
+
+    // 다른 곳 탭하면 메뉴 닫기
+    function onOutsideTap(e) {
+      if (menuEl && !menuEl.contains(e.target) && e.target !== div) {
+        dismissMenu();
+        document.removeEventListener('touchstart', onOutsideTap);
+        document.removeEventListener('mousedown',  onOutsideTap);
       }
     }
-
-    // touch move 리스너 (전역 — 버블 밖으로 나가도 추적)
-    function onTouchMove(e) {
-      const t = e.touches[0];
-      updateHover(t.clientX, t.clientY);
-    }
-    function onTouchEnd(e) {
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend',  onTouchEnd);
-      const t = e.changedTouches[0];
-      const hit = getHoveredBtn(t.clientX, t.clientY);
-      dismissMenu();
-      if      (hit === 'camera') openCamera(id);
-      else if (hit === 'check')  completeBubble(id, null);
-    }
-
-    // mouse move 리스너
-    function onMouseMove(e) {
-      updateHover(e.clientX, e.clientY);
-    }
-    function onMouseUp(e) {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup',   onMouseUp);
-      const hit = getHoveredBtn(e.clientX, e.clientY);
-      dismissMenu();
-      if      (hit === 'camera') openCamera(id);
-      else if (hit === 'check')  completeBubble(id, null);
-    }
-
-    document.addEventListener('touchmove', onTouchMove, { passive: true });
-    document.addEventListener('touchend',  onTouchEnd);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup',   onMouseUp);
+    setTimeout(() => {
+      document.addEventListener('touchstart', onOutsideTap, { passive: true });
+      document.addEventListener('mousedown',  onOutsideTap);
+    }, 100);
   }
 
   function dismissMenu() {
     if (!menuEl) return;
     if (menuEl.parentNode) menuEl.parentNode.removeChild(menuEl);
-    menuEl     = null;
-    hoveredBtn = null;
-    div.classList.remove('pressing');
+    menuEl = null;
+    div.classList.remove('pressing', 'frozen');
   }
-
-  let _pressStartX = 0, _pressStartY = 0;
 
   // ── 꾹 누르기 ──
   const startPress = (clientX, clientY) => {
     if (div.classList.contains('completing') || div.classList.contains('vanish')) return;
+    if (menuEl) return; // 이미 메뉴 떠 있으면 무시
     _pressStartX = clientX;
     _pressStartY = clientY;
     pressing = true;
@@ -1453,31 +1445,31 @@ function makeBubble(text, idx, sizeClass) {
     pressing = false;
     div.classList.remove('pressing');
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    // 메뉴가 이미 떠 있으면 cancelPress로 닫지 않음 (터치 end/up에서 처리)
   };
 
   div.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // iOS 기본 컨텍스트 메뉴 / 텍스트 선택 차단
+    if (menuEl) return; // 메뉴 떠 있으면 버블 터치 무시
+    e.preventDefault();
     const t = e.touches[0];
     startPress(t.clientX, t.clientY);
   }, { passive: false });
 
   div.addEventListener('touchmove', (e) => {
     if (!pressing) return;
-    // 10px 이상 움직였을 때만 취소 (살짝 떨림은 허용)
     const t = e.touches[0];
     const dx = t.clientX - _pressStartX;
     const dy = t.clientY - _pressStartY;
     if (Math.sqrt(dx*dx + dy*dy) > 10) cancelPress();
   }, { passive: true });
 
-  div.addEventListener('touchend', (e) => {
-    if (!menuEl) cancelPress();
+  div.addEventListener('touchend', () => {
+    cancelPress();
+    // 메뉴가 떠 있으면 touchend로 닫지 않음 — 직접 탭으로만 닫힘
   });
 
   div.addEventListener('touchcancel', () => {
     cancelPress();
-    dismissMenu();
+    if (!menuEl) return;
   });
 
   div.addEventListener('mousedown', (e) => {
@@ -1485,11 +1477,11 @@ function makeBubble(text, idx, sizeClass) {
   });
 
   div.addEventListener('mouseup', () => {
-    if (!menuEl) cancelPress();
+    cancelPress();
   });
 
   div.addEventListener('mouseleave', () => {
-    if (!menuEl) cancelPress();
+    cancelPress();
   });
 
   return div;
@@ -1513,8 +1505,11 @@ function openCamera(id) {
     if (lbl) label.textContent = lbl.textContent.trim();
   }
 
+  // 오버레이 먼저 띄우기 — iOS는 사용자 제스처 컨텍스트 안에서 DOM 변경이 있어야 함
   overlay.classList.add('show');
-  startCameraStream();
+
+  // 약간의 딜레이 후 스트림 시작 (오버레이 렌더 후)
+  setTimeout(() => startCameraStream(), 80);
 }
 
 function startCameraStream() {
