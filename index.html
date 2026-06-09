@@ -1306,6 +1306,21 @@ function makeBubble(text, idx, sizeClass) {
       }
     }
 
+    // iOS Safari: 터치 컨텍스트 유지를 위해 input을 미리 생성해둠
+    const camInput = document.createElement('input');
+    camInput.type = 'file';
+    camInput.accept = 'image/*';
+    camInput.capture = 'environment';
+    camInput.style.cssText = 'position:fixed;top:-200px;left:-200px;width:1px;height:1px;opacity:0;';
+    camInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (document.body.contains(camInput)) document.body.removeChild(camInput);
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => completeBubble(id, ev.target.result);
+      reader.readAsDataURL(file);
+    };
+
     // touch move 리스너 (전역 — 버블 밖으로 나가도 추적)
     function onTouchMove(e) {
       const t = e.touches[0];
@@ -1317,8 +1332,13 @@ function makeBubble(text, idx, sizeClass) {
       const t = e.changedTouches[0];
       const hit = getHoveredBtn(t.clientX, t.clientY);
       dismissMenu();
-      if      (hit === 'camera') openCamera(id);
-      else if (hit === 'check')  completeBubble(id, null);
+      if (hit === 'camera') {
+        // iOS: 터치 컨텍스트 안에서 바로 click — dismissMenu 후 즉시 호출
+        document.body.appendChild(camInput);
+        camInput.click();
+      } else if (hit === 'check') {
+        completeBubble(id, null);
+      }
     }
 
     // mouse move 리스너
