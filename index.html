@@ -33,6 +33,8 @@ body {
   background: var(--bg);
   overflow: hidden;
   width: 100vw; height: 100vh;
+  /* iOS 키보드 올라올 때 뷰포트 밀림 방지 */
+  position: fixed;
 }
 
 .app {
@@ -69,6 +71,9 @@ body {
 
 /* ══ HOME ══ */
 #view-home { background: var(--bg); position: relative; overflow: hidden; }
+#view-home .bubble-stage { overflow: visible; }
+/* 메뉴가 bubble-stage 위로 삐져나와도 보이도록 */
+#view-home > .bubble-stage { clip-path: none; }
 
 .glow-orb { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(55px); }
 .glow-orb-1 { width: 65vw; height: 65vw; top: -15%; left: -20%; background: radial-gradient(circle, rgba(180,160,255,0.35) 0%, transparent 70%); }
@@ -88,7 +93,7 @@ body {
 }
 .time-sub { font-size: 13px; color: var(--hint); margin-top: 6px; }
 
-.bubble-stage { flex: 1; position: relative; overflow: hidden; z-index: 1; }
+.bubble-stage { flex: 1; position: relative; overflow: visible; z-index: 1; }
 
 .home-countdown-box {
   text-align: right; cursor: pointer;
@@ -689,9 +694,17 @@ body {
         <div class="time-display" id="clock">09:41</div>
         <div class="time-sub" id="homeSubtitle">루틴 탭에서 시작해보세요</div>
       </div>
-      <div class="home-countdown-box" onclick="openDepartSetting()">
-        <div class="home-countdown-label">출발까지</div>
-        <div class="home-countdown-num" id="homeCountdown">—</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="home-countdown-box" onclick="openDepartSetting()">
+          <div class="home-countdown-label">출발까지</div>
+          <div class="home-countdown-num" id="homeCountdown">—</div>
+        </div>
+        <button id="resetBubblesBtn" onclick="resetBubbles()" style="
+          display:none;font-size:11px;color:var(--hint);
+          background:rgba(255,255,255,0.7);
+          border:0.5px solid var(--border2);border-radius:999px;
+          padding:5px 12px;cursor:pointer;font-family:inherit;font-weight:500;
+        ">초기화</button>
       </div>
     </div>
 
@@ -955,8 +968,116 @@ function renderChecklist(key) {
     };
 
     const handle = d.querySelector('.drag-handle');
+
+    // ── 터치 드래그 (iOS 포함) ──
+    let touchDragSrcIdx = null;
+    let touchDragGhost  = null;
+    let touchDragStartY = 0;
+    let touchDragLastTarget = null;
+
+    handle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const t = e.touches[0];
+      touchDragSrcIdx  = parseInt(d.dataset.idx);
+      touchDragStartY  = t.clientY;
+      dragSrc = d;
+      d.classList.add('dragging');
+
+      // 고스트 생성
+      touchDragGhost = d.cloneNode(true);
+      touchDragGhost.style.cssText = `
+        position:fixed; pointer-events:none; z-index:999;
+        width:${d.offsetWidth}px; opacity:0.85;
+        left:${d.getBoundingClientRect().left}px;
+        top:${d.getBoundingClientRect().top}px;
+        box-shadow:0 8px 32px rgba(80,90,180,0.25);
+        border-radius:14px; background:#fff;
+        transition:none;
+      `;
+      document.body.appendChild(touchDragGhost);
+    }, { passive: false });
+
+    handle.addEventListener('touchmove', (e) => {
+      if (!touchDragGhost) return;
+      e.preventDefault();
+      const t = e.touches[0];
+
+      // 고스트 이동 — 초기 위치에서 dy만큼 이동
+      const dy = t.clientY - touchDragStartY;
+      const initTop = parseFloat(touchDragGhost.dataset.initTop || touchDragGhost.style.top) || 0;
+      if (!touchDragGhost.dataset.initTop) touchDragGhost.dataset.initTop = touchDragGhost.style.top;
+      touchDragGhost.style.top = (parseFloat(touchDragGhost.dataset.initTop) + dy) + 'px';
+
+      // auto-scroll
+      const bodyEl = document.getElementById('checklistBody');
+      const rect = bodyEl.getBoundingClientRect();
+      const ZONE = 80;
+      if (t.clientY < rect.top + ZONE)        startAutoScroll(-1);
+      else if (t.clientY > rect.bottom - ZONE) startAutoScroll(1);
+      else                                      stopAutoScroll();
+
+      // 현재 위치의 아이템 감지
+      touchDragGhost.style.display = 'none';
+      const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+      touchDragGhost.style.display = '';
+
+      const targetItem = elBelow ? elBelow.closest('.check-item') : null;
+      const bodyEl2 = document.getElementById('checklistBody');
+      const items = Array.from(bodyEl2.querySelectorAll('.check-item'));
+
+      items.forEach(el => el.classList.remove('shift-down', 'shift-up'));
+
+      if (targetItem && targetItem !== d) {
+        touchDragLastTarget = targetItem;
+        const fromIdx = parseInt(d.dataset.idx);
+        const toIdx   = parseInt(targetItem.dataset.idx);
+        items.forEach(el => {
+          const i = parseInt(el.dataset.idx);
+          if (el === d) return;
+          if (fromIdx < toIdx && i > fromIdx && i <= toIdx) el.classList.add('shift-up');
+          else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) el.classList.add('shift-down');
+        });
+      }
+    }, { passive: false });
+
+    handle.addEventListener('touchend', (e) => {
+      stopAutoScroll();
+      if (touchDragGhost) {
+        document.body.removeChild(touchDragGhost);
+        touchDragGhost = null;
+      }
+      d.classList.remove('dragging');
+      const bodyEl = document.getElementById('checklistBody');
+      bodyEl.querySelectorAll('.check-item').forEach(el => el.classList.remove('shift-down', 'shift-up'));
+
+      if (touchDragLastTarget && touchDragLastTarget !== d) {
+        const fromIdx = parseInt(d.dataset.idx);
+        const toIdx   = parseInt(touchDragLastTarget.dataset.idx);
+        const arr = templates[key];
+        const [moved] = arr.splice(fromIdx, 1);
+        arr.splice(toIdx, 0, moved);
+        saveTemplates();
+
+        const wasChecked = checkedSet.has(fromIdx);
+        const newSet = new Set();
+        checkedSet.forEach(ci => {
+          if (ci === fromIdx) return;
+          let ni = ci;
+          if (fromIdx < toIdx) { if (ci > fromIdx && ci <= toIdx) ni = ci - 1; }
+          else                  { if (ci >= toIdx && ci < fromIdx) ni = ci + 1; }
+          newSet.add(ni);
+        });
+        if (wasChecked) newSet.add(toIdx);
+        checkedSets[key] = newSet;
+        renderChecklist(key);
+      }
+      touchDragLastTarget = null;
+      dragSrc = null;
+    });
+
+    // ── 마우스 드래그 (데스크탑) ──
     handle.addEventListener('mousedown', () => { d.draggable = true; });
-    handle.addEventListener('touchstart', () => { d.draggable = true; }, {passive:true});
     d.addEventListener('dragend', () => { d.draggable = false; });
 
     d.addEventListener('dragstart', (e) => {
@@ -1138,7 +1259,7 @@ function showDragTooltip() {
     <div class="drag-tooltip-icon">⠿</div>
     <div class="drag-tooltip-text">
       <strong>순서 바꾸는 법</strong>
-      왼쪽 점 아이콘을 잡고 위아래로 드래그해보세요
+      왼쪽 점 아이콘을 길게 누르고 위아래로 드래그해보세요
     </div>
     <button class="drag-tooltip-close" onclick="dismissDragTooltip()">확인</button>
   `;
@@ -1314,6 +1435,31 @@ function buildBubbles(items) {
 
   document.getElementById('homeSubtitle').textContent = '지금 해야 할 것';
   document.getElementById('completeOverlay').classList.remove('show');
+  // 초기화 버튼 표시
+  const resetBtn = document.getElementById('resetBubblesBtn');
+  if (resetBtn) resetBtn.style.display = 'block';
+}
+
+function resetBubbles() {
+  if (physRAF) { cancelAnimationFrame(physRAF); physRAF = null; }
+  physBubbles = [];
+  doneCount = 0; totalBubbles = 0;
+  const stage = document.getElementById('bubbleStage');
+  stage.innerHTML = '';
+  // empty state 복원
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  empty.id = 'emptyState';
+  empty.innerHTML = `
+    <div class="empty-icon"><svg style="width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+    <div class="empty-text"><strong>루틴</strong> 탭에서<br>오늘 항목을 고르고<br><strong>시작하기</strong>를 눌러보세요</div>
+  `;
+  stage.appendChild(empty);
+  document.getElementById('homeSubtitle').textContent = '루틴 탭에서 시작해보세요';
+  const resetBtn = document.getElementById('resetBubblesBtn');
+  if (resetBtn) resetBtn.style.display = 'none';
+  // 떠 있는 액션 메뉴 정리
+  document.querySelectorAll('.bubble-action-menu').forEach(m => m.remove());
 }
 
 function makeBubble(text, idx, sizeClass) {
@@ -1336,20 +1482,23 @@ function makeBubble(text, idx, sizeClass) {
   function showActionMenu() {
     if (menuEl) return;
 
-    const stage  = document.getElementById('bubbleStage');
-    const bRect  = div.getBoundingClientRect();
-    const sRect  = stage.getBoundingClientRect();
-    const cx     = bRect.left - sRect.left + bRect.width / 2;
-    const cy     = bRect.top  - sRect.top  + bRect.height / 2;
-    const r      = bRect.width / 2;
+    const viewHome = document.getElementById('view-home');
+    const bRect    = div.getBoundingClientRect();
+    const vRect    = viewHome.getBoundingClientRect();
+    const cx       = bRect.left - vRect.left + bRect.width / 2;
+    const cy       = bRect.top  - vRect.top  + bRect.height / 2;
+    const r        = bRect.width / 2;
 
     // 버블 정지
     div.classList.add('frozen');
 
     menuEl = document.createElement('div');
     menuEl.className = 'bubble-action-menu';
+
+    // 버블 위쪽 배치, 화면 상단 잘림 방지
+    const menuY = Math.max(44, cy - r - 20);
     menuEl.style.left = cx + 'px';
-    menuEl.style.top  = (cy - r - 20) + 'px';
+    menuEl.style.top  = menuY + 'px';
 
     // 카메라 버튼
     const camBtn = document.createElement('div');
@@ -1363,7 +1512,7 @@ function makeBubble(text, idx, sizeClass) {
 
     menuEl.appendChild(camBtn);
     menuEl.appendChild(chkBtn);
-    stage.appendChild(menuEl);
+    viewHome.appendChild(menuEl);
 
     // ── 버튼에 직접 이벤트 — iOS 제스처 컨텍스트 확보 ──
     camBtn.addEventListener('touchstart', (e) => {
@@ -1564,14 +1713,51 @@ function closeCameraOverlay() {
 
 function shootCamera() {
   const video = document.getElementById('cameraVideo');
+  const targetId = _cameraTargetId;
+
+  // video가 실제로 재생 중인지 확인
+  if (!video.srcObject || video.readyState < 2) {
+    console.warn('video not ready:', video.readyState);
+    return;
+  }
+
+  // ImageCapture API 시도 (iOS 17.4+ 지원)
+  try {
+    const track = _cameraStream && _cameraStream.getVideoTracks()[0];
+    if (track && typeof ImageCapture !== 'undefined') {
+      const imageCapture = new ImageCapture(track);
+      imageCapture.takePhoto().then(blob => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          closeCameraOverlay();
+          if (targetId) completeBubble(targetId, ev.target.result);
+        };
+        reader.readAsDataURL(blob);
+      }).catch(() => {
+        // ImageCapture 실패 시 canvas fallback
+        canvasShoot(video, targetId);
+      });
+      return;
+    }
+  } catch(e) {}
+
+  // canvas fallback
+  canvasShoot(video, targetId);
+}
+
+function canvasShoot(video, targetId) {
+  const w = video.videoWidth  || video.clientWidth  || 640;
+  const h = video.videoHeight || video.clientHeight || 480;
   const canvas = document.createElement('canvas');
-  canvas.width  = video.videoWidth  || 640;
-  canvas.height = video.videoHeight || 480;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, w, h);
+
+  // toDataURL이 빈 이미지인지 체크
   const photoData = canvas.toDataURL('image/jpeg', 0.85);
   closeCameraOverlay();
-  if (_cameraTargetId) completeBubble(_cameraTargetId, photoData);
+  if (targetId) completeBubble(targetId, photoData.length > 5000 ? photoData : null);
 }
 
 // 카메라 버튼 이벤트
@@ -1625,6 +1811,7 @@ function completeBubble(id, photoData) {
 
 function closeOverlay() {
   document.getElementById('completeOverlay').classList.remove('show');
+  if (physRAF) { cancelAnimationFrame(physRAF); physRAF = null; }
   switchView('archive');
 }
 
@@ -2063,14 +2250,19 @@ renderArchive();
 updateTime();
 setInterval(updateTime, 1000);
 
-setInterval(() => {
+// 자정 초기화 — 60초마다 + 앱 포그라운드 복귀 시 체크 (iOS 백그라운드 타이머 보완)
+function checkDateReset() {
   const saved = localStorage.getItem(ARCHIVE_DATE_KEY);
   if (saved && saved !== todayStr()) {
     localStorage.removeItem(ARCHIVE_KEY);
     localStorage.setItem(ARCHIVE_DATE_KEY, todayStr());
     renderArchive();
   }
-}, 60000);
+}
+setInterval(checkDateReset, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkDateReset();
+});
 </script>
 </body>
 </html>
