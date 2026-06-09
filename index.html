@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Ready Go">
 <meta name="theme-color" content="#f2f4ff">
 <!-- tabler 웹폰트 제거 — SVG 인라인으로 대체 -->
+<link rel="manifest" href="manifest.json">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -1420,12 +1421,13 @@ function openCamera(id) {
   input.type = 'file';
   input.accept = 'image/*';
   input.capture = 'environment';
-  input.style.display = 'none';
+  // iOS Safari: display:none이면 .click() 무시됨 — 화면 밖으로 숨김
+  input.style.cssText = 'position:fixed;top:-200px;left:-200px;width:1px;height:1px;opacity:0;';
   document.body.appendChild(input);
 
   input.onchange = (e) => {
     const file = e.target.files[0];
-    document.body.removeChild(input);
+    if (document.body.contains(input)) document.body.removeChild(input);
     if (!file) return;
 
     const reader = new FileReader();
